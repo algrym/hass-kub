@@ -13,7 +13,7 @@ from homeassistant.components.recorder.models import (StatisticData,
                                                       StatisticMeanType,
                                                       StatisticMetaData)
 from homeassistant.components.recorder.statistics import (
-    async_import_statistics,
+    async_add_external_statistics,
     get_last_statistics,
 )
 from homeassistant.const import UnitOfEnergy, UnitOfVolume
@@ -116,6 +116,14 @@ class KUBCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _insert_statistics(self) -> None:
         """Insert KUB statistics.
 
+        Statistics are published under external statistic IDs (``kub:*``)
+        rather than the sensor entity IDs.  The sensors report the current
+        billing-period total, so if they carried a ``state_class`` the
+        recorder would compile its own statistics from those states and
+        interleave rows with the hourly data imported here — two writers on
+        one statistic_id.  External IDs make this coordinator the only
+        writer, which the seeding and dedup logic below rely on.
+
         Fetches the last recorded sum for each statistic before accumulating
         new data so that the running total is truly monotonically increasing
         across billing-period boundaries.  Only data points newer than the
@@ -124,8 +132,8 @@ class KUBCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """
         for utility in self.data["usage"]:
             utility_data = self.data["usage"][utility]
-            cost_statistic_id = f"sensor.kub_{utility}_cost"
-            consumption_statistic_id = f"sensor.kub_{utility}_consumption"
+            cost_statistic_id = f"{DOMAIN}:{utility}_cost"
+            consumption_statistic_id = f"{DOMAIN}:{utility}_consumption"
             _LOGGER.debug(
                 "Updating Statistics for %s and %s",
                 cost_statistic_id,
@@ -214,7 +222,7 @@ class KUBCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 mean_type=StatisticMeanType.NONE,
                 has_sum=True,
                 name=f"{name_prefix} Cost",
-                source="recorder",
+                source=DOMAIN,
                 statistic_id=cost_statistic_id,
                 unit_of_measurement="USD",
                 unit_class=None,
@@ -237,7 +245,7 @@ class KUBCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 mean_type=StatisticMeanType.NONE,
                 has_sum=True,
                 name=f"{name_prefix} Consumption",
-                source="recorder",
+                source=DOMAIN,
                 statistic_id=consumption_statistic_id,
                 unit_of_measurement=unit_of_measurement,
                 unit_class=unit_class,
@@ -250,9 +258,11 @@ class KUBCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     len(cost_statistics),
                     len(consumption_statistics),
                 )
-                async_import_statistics(self.hass, cost_metadata, cost_statistics)
+                async_add_external_statistics(
+                    self.hass, cost_metadata, cost_statistics
+                )
             if consumption_statistics:
-                async_import_statistics(
+                async_add_external_statistics(
                     self.hass, consumption_metadata, consumption_statistics
                 )
             if not cost_statistics and not consumption_statistics:

@@ -27,7 +27,15 @@ async def async_setup_entry(hass: HomeAssistant, config_entry, async_add_entitie
 
 
 class KUBSensor(KUBEntity, SensorEntity):
-    """KUB Sensor Class."""
+    """KUB Sensor Class.
+
+    Reports the current billing-period total, which resets monthly and can
+    be revised downward when KUB corrects provisional data.  These sensors
+    deliberately carry no ``state_class``: long-term statistics come solely
+    from the hourly data the coordinator publishes under the ``kub:*``
+    external statistic IDs.  A ``state_class`` here would make the recorder
+    compile a second, conflicting set of statistics from these states.
+    """
 
     def __init__(self, coordinator, service) -> None:
         """Initialize KUB Sensor."""
@@ -39,29 +47,21 @@ class KUBSensor(KUBEntity, SensorEntity):
         match service:
             case "electricity":
                 self._attr_device_class = SensorDeviceClass.ENERGY
-                self._attr_last_reset = None
                 self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
-                self._attr_state_class = "total_increasing"
                 self._attr_name = "Electricity Consumption"
             case "gas":
                 self._attr_device_class = SensorDeviceClass.GAS
-                self._attr_last_reset = None
                 self._attr_native_unit_of_measurement = UnitOfVolume.CENTUM_CUBIC_FEET
-                self._attr_state_class = "total_increasing"
                 self._attr_suggested_display_precision = 0
                 self._attr_name = "Gas Consumption"
             case "water":
                 self._attr_device_class = SensorDeviceClass.WATER
-                self._attr_last_reset = None
                 self._attr_native_unit_of_measurement = UnitOfVolume.CUBIC_FEET
-                self._attr_state_class = "total_increasing"
                 self._attr_suggested_display_precision = 0
                 self._attr_name = "Water Consumption"
             case "wastewater":
                 self._attr_device_class = SensorDeviceClass.WATER
-                self._attr_last_reset = None
                 self._attr_native_unit_of_measurement = UnitOfVolume.CUBIC_FEET
-                self._attr_state_class = "total_increasing"
                 self._attr_suggested_display_precision = 0
                 self._attr_name = "Waste Water Consumption"
 
@@ -80,7 +80,13 @@ class KUBSensor(KUBEntity, SensorEntity):
 
 
 class KUBCostSensor(KUBEntity, SensorEntity):
-    """KUB Cost Sensor Class."""
+    """KUB Cost Sensor Class.
+
+    Reports the current billing-period cost.  No ``state_class`` for the
+    same reason as KUBSensor — with ``state_class: total`` the recorder
+    compiled the monthly billing reset as a negative delta, driving the
+    cumulative cost statistics negative.
+    """
 
     def __init__(self, coordinator, service) -> None:
         """Initialize KUB Sensor."""
@@ -92,29 +98,21 @@ class KUBCostSensor(KUBEntity, SensorEntity):
         match service:
             case "electricity":
                 self._attr_device_class = SensorDeviceClass.MONETARY
-                self._attr_last_reset = None
                 self._attr_native_unit_of_measurement = "USD"
-                self._attr_state_class = "total"
                 self._attr_name = "Electricity Cost"
             case "gas":
                 self._attr_device_class = SensorDeviceClass.MONETARY
-                self._attr_last_reset = None
                 self._attr_native_unit_of_measurement = "USD"
-                self._attr_state_class = "total"
                 self._attr_suggested_display_precision = 0
                 self._attr_name = "Gas Cost"
             case "water":
                 self._attr_device_class = SensorDeviceClass.MONETARY
-                self._attr_last_reset = None
                 self._attr_native_unit_of_measurement = "USD"
-                self._attr_state_class = "total"
                 self._attr_suggested_display_precision = 0
                 self._attr_name = "Water Cost"
             case "wastewater":
                 self._attr_device_class = SensorDeviceClass.MONETARY
-                self._attr_last_reset = None
                 self._attr_native_unit_of_measurement = "USD"
-                self._attr_state_class = "total"
                 self._attr_suggested_display_precision = 0
                 self._attr_name = "Waste Water Cost"
 
